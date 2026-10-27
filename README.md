@@ -4,140 +4,143 @@
 ![License](https://img.shields.io/badge/license-MIT-brightgreen)
 ![Go](https://img.shields.io/badge/built%20with-Go-00ADD8?logo=go&logoColor=white)
 
-Tap de Homebrew para [**omega**](https://github.com/lcajigasm/omega): mantenimiento
-de macOS guiado por IA que junta lo que hacen
-[topgrade](https://github.com/topgrade-rs/topgrade) (actualizar todo) y
-[Mole](https://github.com/tw93/Mole) (limpiar y optimizar), con un modelo de
-Anthropic, OpenAI, OpenRouter u OpenCode que ejecuta cada paso, diagnostica los
-errores y corrige la configuración.
+Homebrew tap for [**omega**](https://github.com/lcajigasm/omega): AI-driven
+macOS maintenance that combines what [topgrade](https://github.com/topgrade-rs/topgrade)
+does (update everything) and what [Mole](https://github.com/tw93/Mole) does
+(clean and optimise), with a model from Anthropic, OpenAI, OpenRouter or OpenCode
+that runs each step, diagnoses errors and fixes the configuration. The interface
+is available in English, Spanish, French, German and Portuguese.
 
-## Requisitos
+## Requirements
 
-- macOS (Apple Silicon o Intel)
+- macOS (Apple Silicon or Intel)
 - [Homebrew](https://brew.sh)
-- Una API key de al menos uno de estos proveedores:
+- An API key for at least one of these providers:
 
-| Proveedor | Dónde conseguir la key |
+| Provider | Where to get a key |
 |---|---|
 | Anthropic | <https://console.anthropic.com/settings/keys> |
 | OpenAI | <https://platform.openai.com/api-keys> |
 | OpenRouter | <https://openrouter.ai/settings/keys> |
 | OpenCode Zen | <https://opencode.ai/auth> |
 
-Go se instala automáticamente como dependencia de compilación.
+Go is installed automatically as a build dependency.
 
-## Instalación
+## Install
 
 ```bash
 brew tap lcajigasm/omega
 brew install omega
 ```
 
-o en un solo paso:
+or in one step:
 
 ```bash
 brew install lcajigasm/omega/omega
 ```
 
-> homebrew-core ya tiene una fórmula llamada `omega` (un motor de búsqueda de
-> Xapian). Si `brew install omega` intenta instalar esa, usa el nombre completo
+> homebrew-core already has a formula called `omega` (a Xapian search engine).
+> If `brew install omega` picks that one, use the full name
 > `lcajigasm/omega/omega`.
 
-Opcional, para usar topgrade y Mole como backends:
+Optional, to use topgrade and Mole as backends:
 
 ```bash
 brew install topgrade mole
 ```
 
-## Primeros pasos
+## Getting started
 
 ```bash
-omega setup        # elige proveedor, guarda la API key en el llavero y escoge modelo
-omega analyze      # informe del estado del Mac sin cambiar nada
-omega              # mantenimiento completo: actualizar + limpiar + resumen
+omega setup        # pick a provider, store the API key in the Keychain and choose a model
+omega analyze      # report on the state of your Mac without changing anything
+omega              # complete maintenance: update + clean + summary
 ```
 
-Otras tareas:
+Other tasks:
 
-| Comando | Qué hace |
+| Command | What it does |
 |---|---|
-| `omega update` | solo actualizaciones (equivalente a topgrade) |
-| `omega clean` | solo limpieza (equivalente a `mo clean`) |
-| `omega fix` | diagnostica y arregla la configuración de topgrade y Mole |
-| `omega -p "…"` | tarea libre en lenguaje natural |
-| `omega steps` | pasos de mantenimiento detectados en tu Mac |
-| `omega steps run brew npm` | ejecutar pasos sin IA |
+| `omega update` | updates only (like topgrade) |
+| `omega clean` | cleanup only (like `mo clean`) |
+| `omega fix` | diagnoses and fixes the topgrade and Mole configuration |
+| `omega -p "…"` | free-form task in natural language |
+| `omega steps` | maintenance steps detected on your Mac |
+| `omega steps run brew npm` | run steps without AI |
 
-Las acciones peligrosas (borrar archivos, `sudo`, editar configuraciones) piden
-confirmación. Los comandos destructivos (`rm -rf ~`, `diskutil erase…`,
-`curl | sh`…) están bloqueados siempre.
+Dangerous actions (deleting files, `sudo`, editing configuration) ask for
+confirmation. Destructive commands (`rm -rf ~`, `diskutil erase…`, `curl | sh`…)
+are always blocked.
 
-La documentación completa está en el
-[README de omega](https://github.com/lcajigasm/omega#readme).
+The interface language follows your system locale; override it with
+`omega config set language es` or `OMEGA_LANG=fr`.
 
-## Qué instala
+Full documentation is in the
+[omega README](https://github.com/lcajigasm/omega#readme).
 
-- El binario `omega` en `$(brew --prefix)/bin`.
-- Autocompletado para zsh, bash y fish.
+## What gets installed
 
-Se compila desde el código fuente de la versión publicada
-(`go build`, con la versión incrustada en `omega --version`).
+- The `omega` binary in `$(brew --prefix)/bin`.
+- Shell completion for zsh, bash and fish.
 
-## Actualizar
+It is built from the source of the published release (`go build`, with the
+version embedded in `omega --version`).
+
+## Upgrade
 
 ```bash
 brew update
 brew upgrade omega
 ```
 
-## Desinstalar
+## Uninstall
 
 ```bash
 brew uninstall omega
 brew untap lcajigasm/omega
 ```
 
-omega guarda datos fuera de Homebrew. Para borrarlos también:
+omega keeps data outside Homebrew. To remove it as well:
 
 ```bash
 rm -rf ~/.config/omega ~/.local/state/omega
-security delete-generic-password -s omega-cli -a anthropic   # repetir por proveedor
+security delete-generic-password -s omega-cli -a anthropic   # repeat per provider
 ```
 
-## Instalar la versión en desarrollo
+## Install the development version
 
 ```bash
 brew install --HEAD lcajigasm/omega/omega
 ```
 
-## Solución de problemas
+## Troubleshooting
 
-**`Error: No available formula with the name "omega"`**: ejecuta
-`brew tap lcajigasm/omega` o usa el nombre completo `lcajigasm/omega/omega`.
+**`Error: No available formula with the name "omega"`**: run
+`brew tap lcajigasm/omega` or use the full name `lcajigasm/omega/omega`.
 
-**Se instala el `omega` de Xapian**: desinstálalo (`brew uninstall omega`) e
-instala con el nombre completo.
+**The Xapian `omega` gets installed**: uninstall it (`brew uninstall omega`) and
+install with the full name.
 
-**Falla la compilación**: ejecuta `brew update` y vuelve a intentarlo. Si sigue
-fallando, abre un issue en <https://github.com/lcajigasm/omega/issues> con la
-salida de `brew install --verbose --debug lcajigasm/omega/omega`.
+**The build fails**: run `brew update` and try again. If it still fails, open an
+issue at <https://github.com/lcajigasm/omega/issues> with the output of
+`brew install --verbose --debug lcajigasm/omega/omega`.
 
-## Para mantenedores
+## For maintainers
 
-Al publicar una nueva versión de omega:
+When releasing a new omega version:
 
 ```bash
-# en el repositorio omega
+# in the omega repository
 git tag v0.2.0 && git push origin v0.2.0
-make formula VERSION=0.2.0               # actualiza url y sha256 en Formula/omega.rb
+make formula VERSION=0.2.0               # updates url and sha256 in Formula/omega.rb
 cp Formula/omega.rb ../homebrew-omega/Formula/omega.rb
 
-# en este repositorio
+# in this repository
 brew audit --strict --online lcajigasm/omega/omega
 brew install --build-from-source lcajigasm/omega/omega && brew test omega
 git commit -am "omega 0.2.0" && git push
 ```
 
-## Licencia
+## License
 
 [MIT](LICENSE) © Luis Cajigas
