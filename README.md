@@ -7,15 +7,20 @@
 Homebrew tap for [**omega**](https://github.com/lcajigasm/omega): AI-driven
 macOS maintenance that combines what [topgrade](https://github.com/topgrade-rs/topgrade)
 does (update everything) and what [Mole](https://github.com/tw93/Mole) does
-(clean and optimise), with a model from Anthropic, OpenAI, OpenRouter or OpenCode
-that runs each step, diagnoses errors and fixes the configuration. The interface
-is available in English, Spanish, French, German and Portuguese.
+(clean and optimise), with a model from Anthropic, OpenAI, OpenRouter, OpenCode or
+a local server (Ollama, LM Studio) that runs each step, diagnoses errors and fixes
+the configuration. By default it uses a small, cheap model and switches to a
+stronger one only when something fails. The interface is available in English,
+Spanish, French, German and Portuguese.
+
+![omega running a maintenance session](https://raw.githubusercontent.com/lcajigasm/omega/main/docs/assets/demo.gif)
 
 ## Requirements
 
 - macOS (Apple Silicon or Intel)
 - [Homebrew](https://brew.sh)
-- An API key for at least one of these providers:
+- An API key for at least one of these providers, or a local model server
+  ([Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai)), which needs no key:
 
 | Provider | Where to get a key |
 |---|---|
@@ -64,12 +69,16 @@ Other tasks:
 | `omega update` | updates only (like topgrade) |
 | `omega clean` | cleanup only (like `mo clean`) |
 | `omega fix` | diagnoses and fixes the topgrade and Mole configuration |
+| `omega tune` | reviews your tools' configuration against the current docs and proposes improvements |
+| `omega docker` | shows what Docker uses and cleans only what you select |
+| `omega model` | chooses the model: automatic (cheap, stronger on failures) or a fixed one |
 | `omega -p "…"` | free-form task in natural language |
 | `omega steps` | maintenance steps detected on your Mac |
 | `omega steps run brew npm` | run steps without AI |
 
+Recommendations arrive on a selection card where you tick what omega should do.
 Dangerous actions (deleting files, `sudo`, editing configuration) ask for
-confirmation. Destructive commands (`rm -rf ~`, `diskutil erase…`, `curl | sh`…)
+confirmation, and Docker cleanups ask every time, even with `--yes`. Destructive commands (`rm -rf ~`, `diskutil erase…`, `curl | sh`…)
 are always blocked.
 
 The interface language follows your system locale; override it with
