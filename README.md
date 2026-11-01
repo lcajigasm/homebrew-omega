@@ -44,6 +44,12 @@ or in one step:
 brew install lcajigasm/omega/omega
 ```
 
+The formula is also published from [lcajigasm/homebrew-tap](https://github.com/lcajigasm/homebrew-tap):
+
+```bash
+brew install lcajigasm/tap/omega
+```
+
 > homebrew-core already has a formula called `omega` (a Xapian search engine).
 > If `brew install omega` picks that one, use the full name
 > `lcajigasm/omega/omega`.
@@ -95,6 +101,9 @@ Full documentation is in the
 It is built from the source of the published release (`go build`, with the
 version embedded in `omega --version`).
 
+The stable install uses the binary archive published with that release. `brew
+install --HEAD` still builds from source.
+
 ## Upgrade
 
 ```bash
@@ -135,6 +144,11 @@ issue at <https://github.com/lcajigasm/omega/issues> with the output of
 `brew install --verbose --debug lcajigasm/omega/omega`.
 
 ## For maintainers
+
+`.github/workflows/update.yml` checks the latest public release of
+[lcajigasm/omega](https://github.com/lcajigasm/omega) every hour (and when
+started by hand). If the tag differs from `Formula/omega.rb`, it rewrites the
+version, URL and sha256 and commits that to `main`.
 
 When releasing a new omega version:
 
