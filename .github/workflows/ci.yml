@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  formula:
+    runs-on: macos-14
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_ANALYTICS: "1"
+      HOMEBREW_NO_ENV_HINTS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Tap, style, audit and install
+        run: |
+          set -eu
+          # A branch tip is what `git clone` checks out when Homebrew taps a local path.
+          git checkout -B ci-checkout
+          brew tap lcajigasm/omega "$GITHUB_WORKSPACE"
+          if brew trust --help >/dev/null 2>&1; then
+            brew trust lcajigasm/omega
+          fi
+          brew style lcajigasm/omega
+          brew audit --strict lcajigasm/omega/omega
+          brew install lcajigasm/omega/omega
+          formula_version="$(brew info --json=v2 lcajigasm/omega/omega | python3 -c 'import json,sys; print(json.load(sys.stdin)["formulae"][0]["versions"]["stable"])')"
+          actual="$(omega --version)"
+          printf '%s\n' "$actual"
+          python3 -c 'import sys; formula, actual = sys.argv[1], sys.argv[2]; tokens = actual.split(); ok = formula in tokens or ("v"+formula) in tokens or actual.strip() in (formula, "v"+formula); sys.exit(0 if ok else "omega --version %r does not match formula version %s" % (actual, formula))' "$formula_version" "$actual"
+          printf 'omega --version matches formula %s\n' "$formula_version"
