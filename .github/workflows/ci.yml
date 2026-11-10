@@ -18,6 +18,8 @@ jobs:
       HOMEBREW_NO_ENV_HINTS: "1"
       # pull_request checks out a merge commit; migrate the tap to the PR head.
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      # Full object id. `git fetch origin a9066cc` looks up a remote ref and fails.
+      FORMULA_COMMIT: a9066cc16f4dc48ecd48535eff280e680b44de08
     steps:
       - name: Install omega 0.13.0 from a9066cc
         run: |
@@ -28,9 +30,14 @@ jobs:
           brew tap lcajigasm/omega
           TAP="$(brew --repo lcajigasm/omega)"
           echo "tap path: ${TAP}"
-          echo "=== fetch and checkout a9066cc ==="
-          git -C "$TAP" fetch origin a9066cc
-          git -C "$TAP" checkout --detach a9066cc
+          echo "=== fetch main and checkout ${FORMULA_COMMIT} ==="
+          git -C "$TAP" fetch origin main
+          if ! git -C "$TAP" cat-file -e "${FORMULA_COMMIT}^{commit}" 2>/dev/null; then
+            echo "=== deepen history until ${FORMULA_COMMIT} is present ==="
+            git -C "$TAP" fetch --unshallow origin main || git -C "$TAP" fetch --depth=100 origin main
+          fi
+          git -C "$TAP" cat-file -e "${FORMULA_COMMIT}^{commit}"
+          git -C "$TAP" checkout --detach "$FORMULA_COMMIT"
           echo "HEAD $(git -C "$TAP" rev-parse HEAD)"
           git -C "$TAP" log -1 --oneline
           if brew trust --help >/dev/null 2>&1; then
@@ -66,16 +73,19 @@ jobs:
           set -euxo pipefail
           TAP="$(brew --repo lcajigasm/omega)"
           echo "=== fetch PR head ${PR_HEAD_SHA} ==="
-          git -C "$TAP" fetch origin "$PR_HEAD_SHA"
+          if ! git -C "$TAP" cat-file -e "${PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+            git -C "$TAP" fetch origin "$PR_HEAD_SHA" || git -C "$TAP" fetch origin "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          fi
+          git -C "$TAP" cat-file -e "${PR_HEAD_SHA}^{commit}"
           # Keep the local upstream branch on the last formula commit. brew update
           # --simulate-from-current-branch diffs that branch against HEAD.
-          git -C "$TAP" branch -f main a9066cc
+          git -C "$TAP" branch -f main "$FORMULA_COMMIT"
           git -C "$TAP" merge-base --is-ancestor main "$PR_HEAD_SHA"
           git -C "$TAP" checkout --detach "$PR_HEAD_SHA"
           echo "HEAD $(git -C "$TAP" rev-parse HEAD)"
           git -C "$TAP" log -1 --oneline
-          echo "=== diff a9066cc..PR head ==="
-          git -C "$TAP" diff --name-status a9066cc "$PR_HEAD_SHA"
+          echo "=== diff ${FORMULA_COMMIT}..PR head ==="
+          git -C "$TAP" diff --name-status "$FORMULA_COMMIT" "$PR_HEAD_SHA"
           test ! -e "$TAP/Formula/omega.rb"
           echo "=== tap_migrations.json ==="
           cat "$TAP/tap_migrations.json"
