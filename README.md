@@ -1,167 +1,32 @@
 # homebrew-omega
 
-![Platform](https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-brightgreen)
-![Go](https://img.shields.io/badge/built%20with-Go-00ADD8?logo=go&logoColor=white)
+**Deprecated.** This tap no longer publishes formulae. Install omega from the
+canonical tap [lcajigasm/homebrew-tap](https://github.com/lcajigasm/homebrew-tap)
+(`lcajigasm/tap`). `brew update` migrates an existing `lcajigasm/omega/omega`
+keg to `lcajigasm/tap/omega`.
 
-Homebrew tap for [**omega**](https://github.com/lcajigasm/omega): AI-driven
-macOS maintenance that combines what [topgrade](https://github.com/topgrade-rs/topgrade)
-does (update everything) and what [Mole](https://github.com/tw93/Mole) does
-(clean and optimise), with a model from Anthropic, OpenAI, OpenRouter, OpenCode or
-a local server (Ollama, LM Studio) that runs each step, diagnoses errors and fixes
-the configuration. By default it uses a small, cheap model and switches to a
-stronger one only when something fails. The interface is available in English,
-Spanish, French, German and Portuguese.
+homebrew-core ships an unrelated formula also named `omega`. After the
+migration, `brew info omega` reports the tap `lcajigasm/tap`.
 
-![omega running a maintenance session](https://raw.githubusercontent.com/lcajigasm/omega/main/docs/assets/demo.gif)
-
-## Requirements
-
-- macOS (Apple Silicon or Intel)
-- [Homebrew](https://brew.sh)
-- An API key for at least one of these providers, or a local model server
-  ([Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai)), which needs no key:
-
-| Provider | Where to get a key |
-|---|---|
-| Anthropic | <https://console.anthropic.com/settings/keys> |
-| OpenAI | <https://platform.openai.com/api-keys> |
-| OpenRouter | <https://openrouter.ai/settings/keys> |
-| OpenCode Zen | <https://opencode.ai/auth> |
-
-Go is installed automatically as a build dependency.
+The program itself is documented in the
+[omega README](https://github.com/lcajigasm/omega#readme).
 
 ## Install
-
-```bash
-brew tap lcajigasm/omega
-brew install omega
-```
-
-or in one step:
-
-```bash
-brew install lcajigasm/omega/omega
-```
-
-The formula is also published from [lcajigasm/homebrew-tap](https://github.com/lcajigasm/homebrew-tap):
 
 ```bash
 brew install lcajigasm/tap/omega
 ```
 
-> homebrew-core already has a formula called `omega` (a Xapian search engine).
-> If `brew install omega` picks that one, use the full name
-> `lcajigasm/omega/omega`.
-
-Optional, to use topgrade and Mole as backends:
+## Existing installs
 
 ```bash
-brew install topgrade mole
+brew update && brew upgrade omega
 ```
 
-## Getting started
+If the keg does not move to `lcajigasm/tap`:
 
 ```bash
-omega setup        # pick a provider, store the API key in the Keychain and choose a model
-omega analyze      # report on the state of your Mac without changing anything
-omega              # complete maintenance: update + clean + summary
-```
-
-Other tasks:
-
-| Command | What it does |
-|---|---|
-| `omega update` | updates only (like topgrade) |
-| `omega clean` | cleanup only (like `mo clean`) |
-| `omega fix` | diagnoses and fixes the topgrade and Mole configuration |
-| `omega tune` | reviews your tools' configuration against the current docs and proposes improvements |
-| `omega docker` | shows what Docker uses and cleans only what you select |
-| `omega model` | chooses the model: automatic (cheap, stronger on failures) or a fixed one |
-| `omega -p "…"` | free-form task in natural language |
-| `omega steps` | maintenance steps detected on your Mac |
-| `omega steps run brew npm` | run steps without AI |
-
-Recommendations arrive on a selection card where you tick what omega should do.
-Dangerous actions (deleting files, `sudo`, editing configuration) ask for
-confirmation, and Docker cleanups ask every time, even with `--yes`. Destructive commands (`rm -rf ~`, `diskutil erase…`, `curl | sh`…)
-are always blocked.
-
-The interface language follows your system locale; override it with
-`omega config set language es` or `OMEGA_LANG=fr`.
-
-Full documentation is in the
-[omega README](https://github.com/lcajigasm/omega#readme).
-
-## What gets installed
-
-- The `omega` binary in `$(brew --prefix)/bin`.
-- Shell completion for zsh, bash and fish.
-
-It is built from the source of the published release (`go build`, with the
-version embedded in `omega --version`).
-
-The stable install uses the binary archive published with that release. `brew
-install --HEAD` still builds from source.
-
-## Upgrade
-
-```bash
-brew update
-brew upgrade omega
-```
-
-## Uninstall
-
-```bash
-brew uninstall omega
-brew untap lcajigasm/omega
-```
-
-omega keeps data outside Homebrew. To remove it as well:
-
-```bash
-rm -rf ~/.config/omega ~/.local/state/omega
-security delete-generic-password -s omega-cli -a anthropic   # repeat per provider
-```
-
-## Install the development version
-
-```bash
-brew install --HEAD lcajigasm/omega/omega
-```
-
-## Troubleshooting
-
-**`Error: No available formula with the name "omega"`**: run
-`brew tap lcajigasm/omega` or use the full name `lcajigasm/omega/omega`.
-
-**The Xapian `omega` gets installed**: uninstall it (`brew uninstall omega`) and
-install with the full name.
-
-**The build fails**: run `brew update` and try again. If it still fails, open an
-issue at <https://github.com/lcajigasm/omega/issues> with the output of
-`brew install --verbose --debug lcajigasm/omega/omega`.
-
-## For maintainers
-
-`.github/workflows/update.yml` checks the latest public release of
-[lcajigasm/omega](https://github.com/lcajigasm/omega) every hour (and when
-started by hand). If the tag differs from `Formula/omega.rb`, it rewrites the
-version, URL and sha256 and commits that to `main`.
-
-When releasing a new omega version:
-
-```bash
-# in the omega repository
-git tag v0.2.0 && git push origin v0.2.0
-make formula VERSION=0.2.0               # updates url and sha256 in Formula/omega.rb
-cp Formula/omega.rb ../homebrew-omega/Formula/omega.rb
-
-# in this repository
-brew audit --strict --online lcajigasm/omega/omega
-brew install --build-from-source lcajigasm/omega/omega && brew test omega
-git commit -am "omega 0.2.0" && git push
+brew uninstall omega && brew untap lcajigasm/omega && brew install lcajigasm/tap/omega
 ```
 
 ## License
