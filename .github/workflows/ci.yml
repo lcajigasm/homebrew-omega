@@ -8,30 +8,231 @@ permissions:
   contents: read
 
 jobs:
-  formula:
-    runs-on: macos-14
+  migration:
+    name: Migrate lcajigasm/omega/omega 0.13.0 to lcajigasm/tap 0.15.0
+    runs-on: macos-15
+    timeout-minutes: 60
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
       HOMEBREW_NO_ANALYTICS: "1"
       HOMEBREW_NO_ENV_HINTS: "1"
+      # pull_request checks out a merge commit; migrate the tap to the PR head.
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      # Full object id. `git fetch origin a9066cc` looks up a remote ref and fails.
+      FORMULA_COMMIT: a9066cc16f4dc48ecd48535eff280e680b44de08
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Tap, style, audit and install
+      - name: Install omega 0.13.0 from a9066cc
         run: |
-          set -eu
-          # A branch tip is what `git clone` checks out when Homebrew taps a local path.
-          git checkout -B ci-checkout
-          brew tap lcajigasm/omega "$GITHUB_WORKSPACE"
+          set -euxo pipefail
+          echo "=== brew --version ==="
+          brew --version
+          echo "=== brew tap lcajigasm/omega ==="
+          brew tap lcajigasm/omega
+          TAP="$(brew --repo lcajigasm/omega)"
+          echo "tap path: ${TAP}"
+          echo "=== fetch main and checkout ${FORMULA_COMMIT} ==="
+          git -C "$TAP" fetch origin main
+          if ! git -C "$TAP" cat-file -e "${FORMULA_COMMIT}^{commit}" 2>/dev/null; then
+            echo "=== deepen history until ${FORMULA_COMMIT} is present ==="
+            git -C "$TAP" fetch --unshallow origin main || git -C "$TAP" fetch --depth=100 origin main
+          fi
+          git -C "$TAP" cat-file -e "${FORMULA_COMMIT}^{commit}"
+          git -C "$TAP" checkout --detach "$FORMULA_COMMIT"
+          echo "HEAD $(git -C "$TAP" rev-parse HEAD)"
+          git -C "$TAP" log -1 --oneline
           if brew trust --help >/dev/null 2>&1; then
+            echo "=== brew trust lcajigasm/omega ==="
             brew trust lcajigasm/omega
           fi
-          brew style lcajigasm/omega
-          brew audit --strict lcajigasm/omega/omega
+          echo "=== brew install lcajigasm/omega/omega ==="
           brew install lcajigasm/omega/omega
-          formula_version="$(brew info --json=v2 lcajigasm/omega/omega | python3 -c 'import json,sys; print(json.load(sys.stdin)["formulae"][0]["versions"]["stable"])')"
-          actual="$(omega --version)"
-          printf '%s\n' "$actual"
-          python3 -c 'import sys; formula, actual = sys.argv[1], sys.argv[2]; tokens = actual.split(); ok = formula in tokens or ("v"+formula) in tokens or actual.strip() in (formula, "v"+formula); sys.exit(0 if ok else "omega --version %r does not match formula version %s" % (actual, formula))' "$formula_version" "$actual"
-          printf 'omega --version matches formula %s\n' "$formula_version"
+          echo "=== omega --version after install ==="
+          omega --version
+          omega --version | grep -F '0.13.0'
+          echo "=== brew list --versions omega ==="
+          brew list --versions omega
+          echo "=== INSTALL_RECEIPT before migration ==="
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import subprocess
+
+          cellar = subprocess.check_output(["brew", "--cellar"], text=True).strip()
+          receipts = sorted(pathlib.Path(cellar, "omega").glob("*/INSTALL_RECEIPT.json"))
+          if not receipts:
+              raise SystemExit(f"no INSTALL_RECEIPT under {cellar}/omega")
+          for receipt in receipts:
+              source = json.loads(receipt.read_text()).get("source", {})
+              print(f"{receipt}: tap={source.get('tap')} versions={source.get('versions')}")
+              if source.get("tap") != "lcajigasm/omega":
+                  raise SystemExit(f"expected install tap lcajigasm/omega, got {source.get('tap')}")
+          PY
+
+      - name: Point lcajigasm/omega at the PR head
+        run: |
+          set -euxo pipefail
+          TAP="$(brew --repo lcajigasm/omega)"
+          echo "=== fetch PR head ${PR_HEAD_SHA} ==="
+          if ! git -C "$TAP" cat-file -e "${PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+            git -C "$TAP" fetch origin "$PR_HEAD_SHA" || git -C "$TAP" fetch origin "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          fi
+          git -C "$TAP" cat-file -e "${PR_HEAD_SHA}^{commit}"
+          # Keep the local upstream branch on the last formula commit. brew update
+          # --simulate-from-current-branch diffs that branch against HEAD.
+          git -C "$TAP" branch -f main "$FORMULA_COMMIT"
+          git -C "$TAP" merge-base --is-ancestor main "$PR_HEAD_SHA"
+          git -C "$TAP" checkout --detach "$PR_HEAD_SHA"
+          echo "HEAD $(git -C "$TAP" rev-parse HEAD)"
+          git -C "$TAP" log -1 --oneline
+          echo "=== diff ${FORMULA_COMMIT}..PR head ==="
+          git -C "$TAP" diff --name-status "$FORMULA_COMMIT" "$PR_HEAD_SHA"
+          test ! -e "$TAP/Formula/omega.rb"
+          echo "=== tap_migrations.json ==="
+          cat "$TAP/tap_migrations.json"
+          python3 - "$TAP/tap_migrations.json" <<'PY'
+          import json
+          import sys
+
+          migrations = json.loads(open(sys.argv[1], encoding="utf-8").read())
+          if migrations.get("omega") != "lcajigasm/tap":
+              raise SystemExit(f"unexpected tap_migrations.json: {migrations}")
+          print("tap_migrations omega -> lcajigasm/tap")
+          PY
+
+      - name: Tap and trust lcajigasm/tap
+        run: |
+          set -euxo pipefail
+          # A third-party tap is not auto-tapped, and a skipped migration does not
+          # run again on a later brew update. Tap the destination first so
+          # migrate_tap_migration rewrites the keg to lcajigasm/tap.
+          echo "=== brew tap lcajigasm/tap ==="
+          brew tap lcajigasm/tap
+          if brew trust --help >/dev/null 2>&1; then
+            echo "=== brew trust lcajigasm/tap ==="
+            brew trust lcajigasm/tap
+          fi
+          echo "=== destination formula ==="
+          brew info --json=v2 lcajigasm/tap/omega | python3 -c 'import json,sys; formula=json.load(sys.stdin)["formulae"][0]; print("destination tap=%s stable=%s" % (formula.get("tap"), formula["versions"]["stable"]))'
+
+      - name: Run brew update migration
+        run: |
+          set -euxo pipefail
+          prepare_simulate_repo() {
+            local dir="$1"
+            if [[ ! -d "${dir}/.git" && ! -f "${dir}/.git" ]]; then
+              echo "skip ${dir}: not a git checkout"
+              return 0
+            fi
+            local upstream
+            upstream="$(git -C "$dir" symbolic-ref -q refs/remotes/origin/HEAD || true)"
+            upstream="${upstream#refs/remotes/origin/}"
+            if [[ -z "$upstream" ]]; then
+              upstream="main"
+            fi
+            if ! git -C "$dir" rev-parse --verify --quiet "$upstream" >/dev/null; then
+              echo "creating ${dir} ${upstream} at HEAD"
+              git -C "$dir" branch "$upstream" HEAD
+            fi
+            if ! git -C "$dir" merge-base --is-ancestor "$upstream" HEAD; then
+              echo "moving ${dir} ${upstream} to HEAD so brew update can simulate"
+              git -C "$dir" branch -f "$upstream" HEAD
+            fi
+            echo "simulate ${dir}: ${upstream}=$(git -C "$dir" rev-parse --short "$upstream") HEAD=$(git -C "$dir" rev-parse --short HEAD)"
+          }
+
+          echo "=== prepare repositories for brew update --simulate-from-current-branch ==="
+          BREW_REPO="$(brew --repo)"
+          shopt -s nullglob
+          prepare_simulate_repo "$BREW_REPO"
+          for dir in "$BREW_REPO"/Library/Taps/*/*; do
+            prepare_simulate_repo "$dir"
+          done
+
+          echo "=== brew update --simulate-from-current-branch ==="
+          # origin/main does not contain this PR until it merges, so a normal
+          # fetch would stay on the 0.13.0 formula. This is Homebrew's hook for
+          # testing a migration that exists only on the checked-out branch.
+          brew update --simulate-from-current-branch
+
+          echo "=== INSTALL_RECEIPT after migration ==="
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import subprocess
+
+          cellar = subprocess.check_output(["brew", "--cellar"], text=True).strip()
+          receipts = sorted(pathlib.Path(cellar, "omega").glob("*/INSTALL_RECEIPT.json"))
+          if not receipts:
+              raise SystemExit(f"no INSTALL_RECEIPT under {cellar}/omega")
+          for receipt in receipts:
+              source = json.loads(receipt.read_text()).get("source", {})
+              print(f"{receipt}: tap={source.get('tap')} versions={source.get('versions')}")
+              if source.get("tap") != "lcajigasm/tap":
+                  raise SystemExit(f"expected migrated tap lcajigasm/tap, got {source.get('tap')}")
+          print("keg tap=lcajigasm/tap")
+          PY
+
+      - name: Assert tap and upgrade to 0.15.0
+        run: |
+          set -euxo pipefail
+          echo "=== brew info omega ==="
+          brew info omega
+          echo "=== brew info --json=v2 omega ==="
+          info_json="$(brew info --json=v2 omega)"
+          printf '%s\n' "$info_json"
+          INFO_JSON="$info_json" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          formula = json.loads(os.environ["INFO_JSON"])["formulae"][0]
+          tap = formula.get("tap")
+          stable = formula.get("versions", {}).get("stable")
+          full_name = formula.get("full_name")
+          print(f"brew info tap={tap} full_name={full_name} stable={stable}")
+          if tap != "lcajigasm/tap":
+              sys.exit(f"expected tap lcajigasm/tap, got {tap}")
+          PY
+
+          echo "=== brew upgrade omega ==="
+          set +e
+          brew upgrade omega
+          upgrade_status=$?
+          set -e
+          echo "brew upgrade omega exit=${upgrade_status}"
+          echo "=== omega --version after upgrade ==="
+          version="$(omega --version || true)"
+          printf '%s\n' "$version"
+          if ! printf '%s\n' "$version" | grep -F 'v0.15.0'; then
+            echo "=== brew reinstall lcajigasm/tap/omega ==="
+            brew reinstall lcajigasm/tap/omega
+            echo "=== omega --version after reinstall ==="
+            version="$(omega --version)"
+            printf '%s\n' "$version"
+          fi
+          printf '%s\n' "$version" | grep -F 'v0.15.0'
+
+          echo "=== brew info --json=v2 omega after upgrade ==="
+          info_json="$(brew info --json=v2 omega)"
+          printf '%s\n' "$info_json"
+          INFO_JSON="$info_json" python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          formula = json.loads(os.environ["INFO_JSON"])["formulae"][0]
+          tap = formula.get("tap")
+          stable = formula.get("versions", {}).get("stable")
+          installed = formula.get("installed") or []
+          print(f"brew info tap={tap} stable={stable} installed={installed}")
+          if tap != "lcajigasm/tap":
+              sys.exit(f"expected tap lcajigasm/tap, got {tap}")
+          if stable != "0.15.0":
+              sys.exit(f"expected stable 0.15.0, got {stable}")
+          versions = [item.get("version") for item in installed]
+          if "0.15.0" not in versions:
+              sys.exit(f"expected an installed 0.15.0 keg, got {versions}")
+          print("omega --version is v0.15.0 and brew info tap is lcajigasm/tap")
+          PY
+          echo "=== brew list --versions omega ==="
+          brew list --versions omega
